@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XO Game with Gmail Login</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .game-container {
+            max-width: 500px;
+            width: 100%;
+            background-color: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        .game-header {
+            background: linear-gradient(to right, #4A00E0, #8E2DE2);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .game-body {
+            padding: 25px;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-gap: 10px;
+            margin: 20px 0;
+        }
+        .cell {
+            aspect-ratio: 1;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid #e9ecef;
+        }
+        .cell:hover {
+            background-color: #e9ecef;
+            transform: scale(1.05);
+        }
+        .cell.x {
+            color: #dc3545;
+        }
+        .cell.o {
+            color: #0d6efd;
+        }
+        .game-status {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 15px 0;
+            min-height: 30px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+        }
+        .auth-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .hidden {
+            display: none;
+        }
+        .winning-cell {
+            background-color: #d1e7dd;
+            border-color: #0f5132;
+        }
+        .player-info {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .gmail-btn {
+            background-color: #DB4437;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        .gmail-btn:hover {
+            background-color: #c23321;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(219, 68, 55, 0.4);
+        }
+        .gmail-btn i {
+            margin-right: 10px;
+            font-size: 1.2rem;
+        }
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid #8E2DE2;
+        }
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .score-item {
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            flex: 1;
+            margin: 0 5px;
+        }
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #8E2DE2;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>XO Game</h1>
+            <p class="mb-0">Classic Tic-Tac-Toe with Gmail Login</p>
+        </div>
+        
+        <div class="game-body">
+            <!-- Authentication Section -->
+            <div class="auth-section">
+                <div id="login-section">
+                    <h3 class="mb-4">Login with Gmail to Play</h3>
+                    <button id="gmail-login-btn" class="gmail-btn">
+                        <i>G</i> Sign in with Gmail
+                    </button>
+                    <div id="auth-message" class="mt-3"></div>
+                </div>
+                
+                <div id="user-info" class="hidden">
+                    <div class="player-info">
+                        <div class="d-flex align-items-center justify-content-center">
+                            <img id="user-avatar" src="" class="user-avatar" alt="User Avatar">
+                            <div>
+                                <div>Welcome, <span id="user-name"></span></div>
+                                <small class="text-muted" id="user-email"></small>
+                            </div>
+                        </div>
+                        <button id="logout-btn" class="btn btn-outline-danger btn-sm mt-2">Logout</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Game Section -->
+            <div id="game-section" class="hidden">
+                <div class="score-board">
+                    <div class="score-item">
+                        <div>X Wins</div>
+                        <div class="score-value" id="x-wins">0</div>
+                    </div>
+                    <div class="score-item">
+                        <div>O Wins</div>
+                        <div class="score-value" id="o-wins">0</div>
+                    </div>
+                    <div class="score-item">
+                        <div>Draws</div>
+                        <div class="score-value" id="draws">0</div>
+                    </div>
+                </div>
+                
+                <div class="player-info">
+                    <div>Current Player: <span id="current-player" class="fw-bold">X</span></div>
+                    <div class="game-status" id="game-status-text">Game in Progress</div>
+                </div>
+                
+                <div class="game-board">
+                    <div class="cell" data-index="0"></div>
+                    <div class="cell" data-index="1"></div>
+                    <div class="cell" data-index="2"></div>
+                    <div class="cell" data-index="3"></div>
+                    <div class="cell" data-index="4"></div>
+                    <div class="cell" data-index="5"></div>
+                    <div class="cell" data-index="6"></div>
+                    <div class="cell" data-index="7"></div>
+                    <div class="cell" data-index="8"></div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <button id="reset-btn" class="btn btn-warning me-2">New Game</button>
+                    <button id="reset-score-btn" class="btn btn-outline-secondary">Reset Scores</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyALXM9g6HkFHuHLYNXjZ417_9d6bkPGatc",
+            authDomain: "tracker-pts.firebaseapp.com",
+            projectId: "tracker-pts",
+            storageBucket: "tracker-pts.firebasestorage.app",
+            messagingSenderId: "237919442573",
+            appId: "1:237919442573:web:e3abad42a0a1f49f5334c4",
+            measurementId: "G-R5K7KNKMYS"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        // Game state variables
+        let currentPlayer = 'X';
+        let gameBoard = ['', '', '', '', '', '', '', '', ''];
+        let gameActive = true;
+        let user = null;
+        let scores = {
+            xWins: 0,
+            oWins: 0,
+            draws: 0
+        };
+
+        // DOM elements
+        const loginSection = document.getElementById('login-section');
+        const userInfo = document.getElementById('user-info');
+        const userName = document.getElementById('user-name');
+        const userEmail = document.getElementById('user-email');
+        const userAvatar = document.getElementById('user-avatar');
+        const gameSection = document.getElementById('game-section');
+        const currentPlayerDisplay = document.getElementById('current-player');
+        const gameStatusText = document.getElementById('game-status-text');
+        const cells = document.querySelectorAll('.cell');
+        const resetBtn = document.getElementById('reset-btn');
+        const resetScoreBtn = document.getElementById('reset-score-btn');
+        const gmailLoginBtn = document.getElementById('gmail-login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authMessage = document.getElementById('auth-message');
+        const xWinsDisplay = document.getElementById('x-wins');
+        const oWinsDisplay = document.getElementById('o-wins');
+        const drawsDisplay = document.getElementById('draws');
+
+        // Authentication event listeners
+        gmailLoginBtn.addEventListener('click', handleGmailLogin);
+        logoutBtn.addEventListener('click', handleLogout);
+
+        // Game event listeners
+        cells.forEach(cell => {
+            cell.addEventListener('click', handleCellClick);
+        });
+        resetBtn.addEventListener('click', resetGame);
+        resetScoreBtn.addEventListener('click', resetScores);
+
+        // Firebase authentication state observer
+        auth.onAuthStateChanged(firebaseUser => {
+            if (firebaseUser) {
+                user = firebaseUser;
+                userName.textContent = user.displayName || 'Player';
+                userEmail.textContent = user.email;
+                userAvatar.src = user.photoURL || 'https://via.placeholder.com/40';
+                
+                loginSection.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                gameSection.classList.remove('hidden');
+                authMessage.textContent = '';
+                
+                // Load scores from localStorage
+                loadScores();
+            } else {
+                user = null;
+                loginSection.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+                gameSection.classList.add('hidden');
+            }
+        });
+
+        // Authentication functions
+        function handleGmailLogin() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    authMessage.textContent = 'Login successful!';
+                    authMessage.className = 'alert alert-success mt-3';
+                })
+                .catch((error) => {
+                    authMessage.textContent = `Login error: ${error.message}`;
+                    authMessage.className = 'alert alert-danger mt-3';
+                });
+        }
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        // Game functions
+        function handleCellClick(event) {
+            const cell = event.target;
+            const cellIndex = parseInt(cell.getAttribute('data-index'));
+            
+            // Check if cell is already taken or game is not active
+            if (gameBoard[cellIndex] !== '' || !gameActive) {
+                return;
+            }
+            
+            // Update game board and UI
+            gameBoard[cellIndex] = currentPlayer;
+            cell.textContent = currentPlayer;
+            cell.classList.add(currentPlayer.toLowerCase());
+            
+            // Check for win or draw
+            if (checkWin()) {
+                gameStatusText.textContent = `Player ${currentPlayer} wins!`;
+                gameStatusText.className = 'game-status alert alert-success';
+                gameActive = false;
+                highlightWinningCells();
+                
+                // Update scores
+                if (currentPlayer === 'X') {
+                    scores.xWins++;
+                    xWinsDisplay.textContent = scores.xWins;
+                } else {
+                    scores.oWins++;
+                    oWinsDisplay.textContent = scores.oWins;
+                }
+                saveScores();
+                return;
+            }
+            
+            if (checkDraw()) {
+                gameStatusText.textContent = "Game ended in a draw!";
+                gameStatusText.className = 'game-status alert alert-warning';
+                gameActive = false;
+                
+                // Update scores
+                scores.draws++;
+                drawsDisplay.textContent = scores.draws;
+                saveScores();
+                return;
+            }
+            
+            // Switch player
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            currentPlayerDisplay.textContent = currentPlayer;
+        }
+
+        function checkWin() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+                [0, 4, 8], [2, 4, 6]             // diagonals
+            ];
+            
+            return winPatterns.some(pattern => {
+                const [a, b, c] = pattern;
+                return gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c];
+            });
+        }
+
+        function checkDraw() {
+            return gameBoard.every(cell => cell !== '');
+        }
+
+        function highlightWinningCells() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]
+            ];
+            
+            for (const pattern of winPatterns) {
+                const [a, b, c] = pattern;
+                if (gameBoard[a] && gameBoard[a] === gameBoard[b] && gameBoard[a] === gameBoard[c]) {
+                    cells[a].classList.add('winning-cell');
+                    cells[b].classList.add('winning-cell');
+                    cells[c].classList.add('winning-cell');
+                    break;
+                }
+            }
+        }
+
+        function resetGame() {
+            currentPlayer = 'X';
+            gameBoard = ['', '', '', '', '', '', '', '', ''];
+            gameActive = true;
+            
+            cells.forEach(cell => {
+                cell.textContent = '';
+                cell.classList.remove('x', 'o', 'winning-cell');
+            });
+            
+            currentPlayerDisplay.textContent = currentPlayer;
+            gameStatusText.textContent = 'Game in Progress';
+            gameStatusText.className = 'game-status';
+        }
+
+        function resetScores() {
+            scores = {
+                xWins: 0,
+                oWins: 0,
+                draws: 0
+            };
+            updateScoreDisplay();
+            saveScores();
+        }
+
+        function updateScoreDisplay() {
+            xWinsDisplay.textContent = scores.xWins;
+            oWinsDisplay.textContent = scores.oWins;
+            drawsDisplay.textContent = scores.draws;
+        }
+
+        function saveScores() {
+            if (user) {
+                localStorage.setItem(`xo_scores_${user.uid}`, JSON.stringify(scores));
+            }
+        }
+
+        function loadScores() {
+            if (user) {
+                const savedScores = localStorage.getItem(`xo_scores_${user.uid}`);
+                if (savedScores) {
+                    scores = JSON.parse(savedScores);
+                    updateScoreDisplay();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
